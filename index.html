@@ -1,0 +1,159 @@
+
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>هماهنگی جلسات ۱۴۰۴</title>
+    <script src="https://cdn.jsdelivr.net/npm/jalaali-js/dist/jalaali.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --main: #2563eb; --holiday: #ef4444; --thu: #f59e0b; }
+        body { font-family: Tahoma, sans-serif; background: #f8fafc; padding: 20px; color: #1e293b; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        .header { text-align: center; margin-bottom: 25px; }
+        .input-section { display: flex; gap: 10px; justify-content: center; margin-bottom: 30px; background: #f1f5f9; padding: 20px; border-radius: 12px; }
+        input { padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; width: 280px; font-family: Tahoma; outline: none; }
+        button { padding: 12px 25px; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #059669; }
+        
+        .calendar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+        .month-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #fff; }
+        .month-name { text-align: center; font-weight: bold; font-size: 1.2em; margin-bottom: 15px; color: var(--main); }
+        .days-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 10px; }
+        .day-label { font-size: 0.75em; color: #64748b; text-align: center; font-weight: bold; }
+        .days-body { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+        .day { 
+            min-height: 85px; border: 1px solid #f1f5f9; border-radius: 8px; cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; padding: 5px; transition: 0.2s; position: relative;
+        }
+        .day:hover { background: #eff6ff; border-color: #bfdbfe; }
+        .day.selected { background: #dbeafe !important; border: 2px solid var(--main); }
+        .day.thu { background: #fffbeb; border: 1px solid var(--thu); } /* هایلایت پنجشنبه */
+        .day.holiday { color: var(--holiday); background: #fef2f2; }
+        .day.empty { border: none; cursor: default; background: transparent; }
+        
+        .day-num { font-weight: bold; font-size: 1em; }
+        .vote-badge { font-size: 0.7em; background: #10b981; color: white; border-radius: 12px; padding: 2px 8px; margin-top: 4px; }
+        .voters { font-size: 0.6em; color: #475569; text-align: center; margin-top: 5px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+        .today { outline: 2px solid var(--main); background: #f0f9ff; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>📅 هماهنگی ۸ جلسه پایانی سال ۱۴۰۴</h1>
+        <p>نام خود را وارد کنید و پنجشنبه‌هایی که می‌توانید شرکت کنید را تیک بزنید.</p>
+    </div>
+
+    <div class="input-section">
+        <input type="text" id="userName" placeholder="نام و نام خانوادگی...">
+        <button onclick="submitData()">ثبت و تایید نهایی</button>
+    </div>
+
+    <div class="calendar-grid" id="calendar-container"></div>
+</div>
+
+<script>
+    // --- ۱. تنظیمات دیتابیس (حتماً جای‌گذاری کنید) ---
+    const SB_URL = 'https://lhecjdhtfzwlnefiliqo.supabase.co';
+    const SB_KEY = 'sb_publishable_yVHtrjitGnj62Ms03QZQAA_GCGeM84d';
+    const client = supabase.createClient(SB_URL, SB_KEY);
+
+    // --- ۲. اطلاعات تقویم (استخراج شده از Time.ir) ---
+    const holidays = { 
+        10: [13, 27], // دی: ولادت امام علی [cite: 5] و مبعث 
+        11: [15, 22], // بهمن: نیمه شعبان و انقلاب 
+        12: [20, 29]  // اسفند: شهادت امام علی [cite: 23] و ملی شدن نفت
+    };
+    const monthNames = ["دی", "بهمن", "اسفند"];
+    
+    let selectedDates = [];
+    let allSubmissions = [];
+
+    async function start() {
+        await fetchResults(); // دریافت آمار قبلی
+        render(); // نمایش تقویم
+    }
+
+    async function fetchResults() {
+        const { data, error } = await client.from('availability').select('*');
+        if (data) allSubmissions = data;
+    }
+
+    function render() {
+        const container = document.getElementById('calendar-container');
+        container.innerHTML = '';
+        [10, 11, 12].forEach(m => container.appendChild(createMonthUI(1404, m)));
+    }
+
+    function createMonthUI(y, m) {
+        const card = document.createElement('div');
+        card.className = 'month-card';
+        card.innerHTML = `<div class="month-name">${monthNames[m-10]} ${y}</div>`;
+        
+        const header = document.createElement('div');
+        header.className = 'days-header';
+        ["ش", "ی", "د", "س", "چ", "پ", "ج"].forEach(d => header.innerHTML += `<div class="day-label">${d}</div>`);
+        card.appendChild(header);
+
+        const body = document.createElement('div');
+        body.className = 'days-body';
+
+        const firstG = jalaali.toGregorian(y, m, 1);
+        const startDay = (new Date(firstG.gy, firstG.gm-1, firstG.gd).getDay() + 1) % 7;
+
+        for (let i = 0; i < startDay; i++) body.innerHTML += `<div class="day empty"></div>`;
+
+        const totalDays = jalaali.jalaaliMonthLength(y, m);
+        for (let d = 1; d <= totalDays; d++) {
+            const dateKey = `${y}/${m}/${d}`;
+            const isThu = ((startDay + d - 1) % 7 === 5); // پنجشنبه 
+            const isFri = ((startDay + d - 1) % 7 === 6); // جمعه
+            const isOfficial = holidays[m]?.includes(d);
+            
+            const dayDiv = document.createElement('div');
+            dayDiv.className = `day ${isThu ? 'thu' : ''} ${isFri || isOfficial ? 'holiday' : ''}`;
+            
+            // نمایش آرا و اسامی
+            const voters = allSubmissions.filter(s => s.selected_dates.includes(dateKey));
+            const namesList = voters.map(v => v.user_name).join('، ');
+
+            dayDiv.innerHTML = `
+                <span class="day-num">${d}</span>
+                ${voters.length > 0 ? `<span class="vote-badge">${voters.length} نفر</span>` : ''}
+                <div class="voters" title="${namesList}">${namesList}</div>
+            `;
+
+            dayDiv.onclick = () => {
+                dayDiv.classList.toggle('selected');
+                if (dayDiv.classList.contains('selected')) selectedDates.push(dateKey);
+                else selectedDates = selectedDates.filter(t => t !== dateKey);
+            };
+            body.appendChild(dayDiv);
+        }
+        card.appendChild(body);
+        return card;
+    }
+
+    async function submitData() {
+        const name = document.getElementById('userName').value.trim();
+        if (!name) return alert('لطفاً ابتدا نام خود را وارد کنید.');
+        if (selectedDates.length === 0) return alert('حداقل یک روز را انتخاب کنید.');
+
+        const { error } = await client.from('availability').insert([
+            { user_name: name, selected_dates: selectedDates }
+        ]);
+
+        if (error) {
+            alert('خطا در ثبت: ' + error.message);
+        } else {
+            alert('انتخاب‌های شما با موفقیت ثبت شد!');
+            location.reload();
+        }
+    }
+
+    start();
+</script>
+</body>
+</html>
